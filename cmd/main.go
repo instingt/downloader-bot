@@ -1,3 +1,4 @@
+// Package main implements the Telegram bot entrypoint.
 package main
 
 import (

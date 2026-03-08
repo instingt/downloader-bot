@@ -5,7 +5,7 @@ SHELL := bash
 ENV_FILE ?= .env
 REQUIRED_ENV_VARS := TELEGRAM_BOT_TOKEN ALLOWED_TELEGRAM_USER_IDS ALLOWED_TELEGRAM_CHAT_IDS
 
-.PHONY: run build-linux-amd64 test tidy check-env
+.PHONY: run build-linux-amd64 test tidy lint check-env
 
 define LOAD_ENV
 if [[ -f "$(ENV_FILE)" ]]; then \
@@ -47,6 +47,9 @@ build-linux-amd64:
 
 test:
 	go test ./...
+
+lint:
+	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest run ./...
 
 tidy:
 	go mod tidy
