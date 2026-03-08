@@ -73,6 +73,8 @@ func handleMessage(bot *tgbotapi.BotAPI, msg *tgbotapi.Message, handlers []handl
 
 	for _, h := range handlers {
 		if h.Matcher(u) {
+			log.Printf("matched message chat_id=%d message_id=%d url=%s", msg.Chat.ID, msg.MessageID, u.String())
+
 			deleteCfg := tgbotapi.NewDeleteMessage(msg.Chat.ID, msg.MessageID)
 			if _, err := bot.Request(deleteCfg); err != nil {
 				log.Printf("failed to delete matched message chat_id=%d message_id=%d: %v", msg.Chat.ID, msg.MessageID, err)

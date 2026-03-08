@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net/url"
 	"os"
 	"os/exec"
@@ -60,10 +61,12 @@ func (h *TikTokHandler) Handle(bot *tgbotapi.BotAPI, u *url.URL, replyChatID int
 	}
 	defer os.RemoveAll(tmpDir)
 
+	log.Printf("tiktok download started chat_id=%d url=%s", replyChatID, u.String())
 	filePath, err := h.downloadVideo(u, tmpDir)
 	if err != nil {
 		return err
 	}
+	log.Printf("tiktok download finished chat_id=%d file=%s", replyChatID, filePath)
 
 	videoMsg := tgbotapi.NewVideo(replyChatID, tgbotapi.FilePath(filePath))
 	if _, err := bot.Send(videoMsg); err != nil {
@@ -71,7 +74,10 @@ func (h *TikTokHandler) Handle(bot *tgbotapi.BotAPI, u *url.URL, replyChatID int
 		if _, docErr := bot.Send(docMsg); docErr != nil {
 			return fmt.Errorf("send video failed: %v; send document fallback failed: %w", err, docErr)
 		}
+		log.Printf("tiktok video sent as document chat_id=%d file=%s", replyChatID, filePath)
+		return nil
 	}
+	log.Printf("tiktok video sent successfully chat_id=%d file=%s", replyChatID, filePath)
 
 	return nil
 }
