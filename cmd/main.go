@@ -3,11 +3,12 @@ package main
 
 import (
 	"log"
-	"strings"
+	"net/url"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
 	"bot-downloader/internal/config"
+	"bot-downloader/internal/handlers"
 )
 
 func main() {
@@ -27,14 +28,18 @@ func main() {
 	updates := bot.GetUpdatesChan(u)
 	log.Printf("bot authorized as %s", bot.Self.UserName)
 
+	var urlHandlers []handlers.Handler
+
+	urlHandlers = append(urlHandlers, handlers.NewTiktokHandler())
+
 	for update := range updates {
-		if err := routeUpdate(bot, update, cfg); err != nil {
+		if err := routeUpdate(bot, update, cfg, urlHandlers); err != nil {
 			log.Printf("failed to handle update: %v", err)
 		}
 	}
 }
 
-func routeUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update, cfg config.Config) error {
+func routeUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update, cfg config.Config, handlers []handlers.Handler) error {
 	if update.Message == nil || update.Message.From == nil || update.Message.Chat == nil {
 		return nil
 	}
@@ -45,28 +50,32 @@ func routeUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update, cfg config.Config
 		if _, ok := cfg.AllowedUserIDs[msg.From.ID]; !ok {
 			return nil
 		}
-		return handleMessage(bot, msg, "dm")
+		return handleMessage(bot, msg, handlers)
 	}
 
 	if msg.Chat.IsGroup() || msg.Chat.IsSuperGroup() {
 		if _, ok := cfg.AllowedChatIDs[msg.Chat.ID]; !ok {
 			return nil
 		}
-		return handleMessage(bot, msg, "group")
+		return handleMessage(bot, msg, handlers)
 	}
 
 	return nil
 }
 
-func handleMessage(_ *tgbotapi.BotAPI, msg *tgbotapi.Message, scope string) error {
-	textLen := len(strings.TrimSpace(msg.Text))
-	log.Printf(
-		"accepted message scope=%s chat_id=%d user_id=%d message_id=%d text_len=%d",
-		scope,
-		msg.Chat.ID,
-		msg.From.ID,
-		msg.MessageID,
-		textLen,
-	)
+func handleMessage(bot *tgbotapi.BotAPI, msg *tgbotapi.Message, handlers []handlers.Handler) error {
+	u, err := url.Parse(msg.Text)
+	if err != nil {
+		// this is not URL message, ignore it
+		return nil
+	}
+
+	for _, h := range handlers {
+		if h.Matcher(u) {
+			return h.Handle(bot, u)
+		}
+	}
+
+	// don't found any handlers for given URL
 	return nil
 }
