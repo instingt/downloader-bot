@@ -2,6 +2,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/url"
 
@@ -30,7 +31,7 @@ func main() {
 
 	var urlHandlers []handlers.Handler
 
-	urlHandlers = append(urlHandlers, handlers.NewTiktokHandler())
+	urlHandlers = append(urlHandlers, handlers.NewTiktokHandler("yt-dlp"))
 
 	for update := range updates {
 		if err := routeUpdate(bot, update, cfg, urlHandlers); err != nil {
@@ -72,7 +73,16 @@ func handleMessage(bot *tgbotapi.BotAPI, msg *tgbotapi.Message, handlers []handl
 
 	for _, h := range handlers {
 		if h.Matcher(u) {
-			return h.Handle(bot, u)
+			deleteCfg := tgbotapi.NewDeleteMessage(msg.Chat.ID, msg.MessageID)
+			if _, err := bot.Request(deleteCfg); err != nil {
+				log.Printf("failed to delete matched message chat_id=%d message_id=%d: %v", msg.Chat.ID, msg.MessageID, err)
+			}
+
+			if err := h.Handle(bot, u); err != nil {
+				return fmt.Errorf("handle matched url: %w", err)
+			}
+
+			return nil
 		}
 	}
 
