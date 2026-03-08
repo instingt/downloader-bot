@@ -9,5 +9,5 @@ import (
 
 type Handler interface {
 	Matcher(*url.URL) bool
-	Handle(*tgbotapi.BotAPI, *url.URL) error
+	Handle(*tgbotapi.BotAPI, *url.URL, int64) error
 }

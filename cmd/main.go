@@ -31,7 +31,7 @@ func main() {
 
 	var urlHandlers []handlers.Handler
 
-	urlHandlers = append(urlHandlers, handlers.NewTiktokHandler("yt-dlp"))
+	urlHandlers = append(urlHandlers, handlers.NewTiktokHandler(cfg.YtDlpBinaryPath))
 
 	for update := range updates {
 		if err := routeUpdate(bot, update, cfg, urlHandlers); err != nil {
@@ -78,7 +78,7 @@ func handleMessage(bot *tgbotapi.BotAPI, msg *tgbotapi.Message, handlers []handl
 				log.Printf("failed to delete matched message chat_id=%d message_id=%d: %v", msg.Chat.ID, msg.MessageID, err)
 			}
 
-			if err := h.Handle(bot, u); err != nil {
+			if err := h.Handle(bot, u, msg.Chat.ID); err != nil {
 				return fmt.Errorf("handle matched url: %w", err)
 			}
 

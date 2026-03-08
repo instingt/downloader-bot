@@ -5,14 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 )
 
 type Config struct {
-	Token          string
-	AllowedUserIDs map[int64]struct{}
-	AllowedChatIDs map[int64]struct{}
+	Token           string
+	AllowedUserIDs  map[int64]struct{}
+	AllowedChatIDs  map[int64]struct{}
+	YtDlpBinaryPath string
 }
 
 func Load() (Config, error) {
@@ -31,10 +33,16 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
+	ytDlpBinaryPath, err := exec.LookPath("yt-dlp")
+	if err != nil {
+		return Config{}, fmt.Errorf("yt-dlp binary not found in PATH: %w", err)
+	}
+
 	return Config{
-		Token:          token,
-		AllowedUserIDs: userIDs,
-		AllowedChatIDs: chatIDs,
+		Token:           token,
+		AllowedUserIDs:  userIDs,
+		AllowedChatIDs:  chatIDs,
+		YtDlpBinaryPath: ytDlpBinaryPath,
 	}, nil
 }
 
