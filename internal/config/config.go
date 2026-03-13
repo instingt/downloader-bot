@@ -12,6 +12,7 @@ import (
 
 type Config struct {
 	Token           string
+	AppEnv          string
 	AllowedUserIDs  map[int64]struct{}
 	AllowedChatIDs  map[int64]struct{}
 	YtDlpBinaryPath string
@@ -21,6 +22,14 @@ func Load() (Config, error) {
 	token := strings.TrimSpace(os.Getenv("TELEGRAM_BOT_TOKEN"))
 	if token == "" {
 		return Config{}, errors.New("TELEGRAM_BOT_TOKEN is required")
+	}
+
+	appEnv := strings.TrimSpace(os.Getenv("APP_ENV"))
+	if appEnv == "" {
+		appEnv = "development"
+	}
+	if appEnv != "development" && appEnv != "production" {
+		return Config{}, fmt.Errorf("APP_ENV must be one of: development, production")
 	}
 
 	userIDs, err := parseIDSet("ALLOWED_TELEGRAM_USER_IDS")
@@ -40,6 +49,7 @@ func Load() (Config, error) {
 
 	return Config{
 		Token:           token,
+		AppEnv:          appEnv,
 		AllowedUserIDs:  userIDs,
 		AllowedChatIDs:  chatIDs,
 		YtDlpBinaryPath: ytDlpBinaryPath,

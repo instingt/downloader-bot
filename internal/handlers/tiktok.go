@@ -5,7 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/url"
 	"os"
 	"os/exec"
@@ -18,11 +18,13 @@ import (
 
 type TikTokHandler struct {
 	ytDlpBinary string
+	logger      *slog.Logger
 }
 
-func NewTiktokHandler(ytDlpBinary string) *TikTokHandler {
+func NewTiktokHandler(ytDlpBinary string, logger *slog.Logger) *TikTokHandler {
 	return &TikTokHandler{
 		ytDlpBinary: ytDlpBinary,
+		logger:      logger,
 	}
 }
 
@@ -54,19 +56,26 @@ func (h *TikTokHandler) Handle(bot *tgbotapi.BotAPI, u *url.URL, replyChatID int
 	if h.ytDlpBinary == "" {
 		return errors.New("yt-dlp binary path is empty")
 	}
+	if h.logger == nil {
+		return errors.New("logger is nil")
+	}
 
 	tmpDir, err := os.MkdirTemp("", "bot-tiktok-*")
 	if err != nil {
 		return fmt.Errorf("create temp dir: %w", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		if cleanupErr := os.RemoveAll(tmpDir); cleanupErr != nil {
+			h.logger.Warn("failed to cleanup temp dir", "dir", tmpDir, "error", cleanupErr)
+		}
+	}()
 
-	log.Printf("tiktok download started chat_id=%d url=%s", replyChatID, u.String())
+	h.logger.Info("tiktok download started", "chat_id", replyChatID, "url", u.String())
 	filePath, err := h.downloadVideo(u, tmpDir)
 	if err != nil {
 		return err
 	}
-	log.Printf("tiktok download finished chat_id=%d file=%s", replyChatID, filePath)
+	h.logger.Info("tiktok download finished", "chat_id", replyChatID, "file", filePath)
 
 	videoMsg := tgbotapi.NewVideo(replyChatID, tgbotapi.FilePath(filePath))
 	if _, err := bot.Send(videoMsg); err != nil {
@@ -74,10 +83,10 @@ func (h *TikTokHandler) Handle(bot *tgbotapi.BotAPI, u *url.URL, replyChatID int
 		if _, docErr := bot.Send(docMsg); docErr != nil {
 			return fmt.Errorf("send video failed: %v; send document fallback failed: %w", err, docErr)
 		}
-		log.Printf("tiktok video sent as document chat_id=%d file=%s", replyChatID, filePath)
+		h.logger.Info("tiktok video sent as document", "chat_id", replyChatID, "file", filePath)
 		return nil
 	}
-	log.Printf("tiktok video sent successfully chat_id=%d file=%s", replyChatID, filePath)
+	h.logger.Info("tiktok video sent successfully", "chat_id", replyChatID, "file", filePath)
 
 	return nil
 }
