@@ -11,11 +11,12 @@ import (
 )
 
 type Config struct {
-	Token           string
-	AppEnv          string
-	AllowedUserIDs  map[int64]struct{}
-	AllowedChatIDs  map[int64]struct{}
-	YtDlpBinaryPath string
+	Token                    string
+	AppEnv                   string
+	AllowedUserIDs           map[int64]struct{}
+	AllowedChatIDs           map[int64]struct{}
+	YtDlpBinaryPath          string
+	InstagramCookiesFilePath string
 }
 
 func Load() (Config, error) {
@@ -47,12 +48,26 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("yt-dlp binary not found in PATH: %w", err)
 	}
 
+	instagramCookiesFilePath := strings.TrimSpace(os.Getenv("INSTAGRAM_COOKIES_FILE_PATH"))
+	if instagramCookiesFilePath == "" {
+		return Config{}, errors.New("INSTAGRAM_COOKIES_FILE_PATH is required")
+	}
+
+	info, err := os.Stat(instagramCookiesFilePath)
+	if err != nil {
+		return Config{}, fmt.Errorf("instagram cookies file path is invalid: %w", err)
+	}
+	if info.IsDir() {
+		return Config{}, errors.New("instagram cookies file path must be a file")
+	}
+
 	return Config{
-		Token:           token,
-		AppEnv:          appEnv,
-		AllowedUserIDs:  userIDs,
-		AllowedChatIDs:  chatIDs,
-		YtDlpBinaryPath: ytDlpBinaryPath,
+		Token:                    token,
+		AppEnv:                   appEnv,
+		AllowedUserIDs:           userIDs,
+		AllowedChatIDs:           chatIDs,
+		YtDlpBinaryPath:          ytDlpBinaryPath,
+		InstagramCookiesFilePath: instagramCookiesFilePath,
 	}, nil
 }
 

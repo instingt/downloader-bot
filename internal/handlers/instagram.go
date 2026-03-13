@@ -15,19 +15,21 @@ import (
 	"bot-downloader/internal/telegram"
 )
 
-type TikTokHandler struct {
-	ytDlpBinary string
-	logger      *slog.Logger
+type InstagramHandler struct {
+	ytDlpBinary     string
+	cookiesFilePath string
+	logger          *slog.Logger
 }
 
-func NewTiktokHandler(ytDlpBinary string, logger *slog.Logger) *TikTokHandler {
-	return &TikTokHandler{
-		ytDlpBinary: ytDlpBinary,
-		logger:      logger,
+func NewInstagramHandler(ytDlpBinary string, cookiesFilePath string, logger *slog.Logger) *InstagramHandler {
+	return &InstagramHandler{
+		ytDlpBinary:     ytDlpBinary,
+		cookiesFilePath: cookiesFilePath,
+		logger:          logger,
 	}
 }
 
-func (h *TikTokHandler) Matcher(u *url.URL) bool {
+func (h *InstagramHandler) Matcher(u *url.URL) bool {
 	if u == nil {
 		return false
 	}
@@ -42,10 +44,15 @@ func (h *TikTokHandler) Matcher(u *url.URL) bool {
 		return false
 	}
 
-	return host == "tiktok.com" || strings.HasSuffix(host, ".tiktok.com")
+	if host != "instagram.com" && !strings.HasSuffix(host, ".instagram.com") {
+		return false
+	}
+
+	path := strings.TrimSpace(u.EscapedPath())
+	return strings.HasPrefix(path, "/reel/")
 }
 
-func (h *TikTokHandler) Handle(ctx context.Context, tg telegram.Client, u *url.URL, replyChatID int64) error {
+func (h *InstagramHandler) Handle(ctx context.Context, tg telegram.Client, u *url.URL, replyChatID int64) error {
 	if tg == nil {
 		return errors.New("telegram client is nil")
 	}
@@ -55,11 +62,14 @@ func (h *TikTokHandler) Handle(ctx context.Context, tg telegram.Client, u *url.U
 	if h.ytDlpBinary == "" {
 		return errors.New("yt-dlp binary path is empty")
 	}
+	if h.cookiesFilePath == "" {
+		return errors.New("instagram cookies file path is empty")
+	}
 	if h.logger == nil {
 		return errors.New("logger is nil")
 	}
 
-	tmpDir, err := os.MkdirTemp("", "bot-tiktok-*")
+	tmpDir, err := os.MkdirTemp("", "bot-instagram-*")
 	if err != nil {
 		return fmt.Errorf("create temp dir: %w", err)
 	}
@@ -69,26 +79,26 @@ func (h *TikTokHandler) Handle(ctx context.Context, tg telegram.Client, u *url.U
 		}
 	}()
 
-	h.logger.Info("tiktok download started", "chat_id", replyChatID, "url", u.String())
+	h.logger.Info("instagram reel download started", "chat_id", replyChatID, "url", u.String())
 	filePath, err := h.downloadVideo(u, tmpDir)
 	if err != nil {
 		return err
 	}
-	h.logger.Info("tiktok download finished", "chat_id", replyChatID, "file", filePath)
+	h.logger.Info("instagram reel download finished", "chat_id", replyChatID, "file", filePath)
 
 	if err := tg.SendVideoFile(ctx, replyChatID, filePath); err != nil {
 		if docErr := tg.SendDocumentFile(ctx, replyChatID, filePath); docErr != nil {
 			return fmt.Errorf("send video failed: %v; send document fallback failed: %w", err, docErr)
 		}
-		h.logger.Info("tiktok video sent as document", "chat_id", replyChatID, "file", filePath)
+		h.logger.Info("instagram reel sent as document", "chat_id", replyChatID, "file", filePath)
 		return nil
 	}
-	h.logger.Info("tiktok video sent successfully", "chat_id", replyChatID, "file", filePath)
+	h.logger.Info("instagram reel sent successfully", "chat_id", replyChatID, "file", filePath)
 
 	return nil
 }
 
-func (h *TikTokHandler) downloadVideo(u *url.URL, tmpDir string) (string, error) {
+func (h *InstagramHandler) downloadVideo(u *url.URL, tmpDir string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
@@ -98,6 +108,7 @@ func (h *TikTokHandler) downloadVideo(u *url.URL, tmpDir string) (string, error)
 		"--no-playlist",
 		"--restrict-filenames",
 		"--merge-output-format", "mp4",
+		"--cookies", h.cookiesFilePath,
 		"--print", "after_move:filepath",
 		"--paths", tmpDir,
 		u.String(),

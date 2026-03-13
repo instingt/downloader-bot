@@ -44,6 +44,7 @@ func main() {
 	var urlHandlers []handlers.Handler
 
 	urlHandlers = append(urlHandlers, handlers.NewTiktokHandler(cfg.YtDlpBinaryPath, logger))
+	urlHandlers = append(urlHandlers, handlers.NewInstagramHandler(cfg.YtDlpBinaryPath, cfg.InstagramCookiesFilePath, logger))
 
 	if err := tgClient.Start(context.Background(), func(ctx context.Context, msg telegram.IncomingMessage) error {
 		return routeMessage(ctx, tgClient, msg, cfg, urlHandlers, logger)
