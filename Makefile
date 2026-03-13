@@ -5,7 +5,7 @@ SHELL := bash
 ENV_FILE ?= .env
 REQUIRED_ENV_VARS := TELEGRAM_BOT_TOKEN ALLOWED_TELEGRAM_USER_IDS ALLOWED_TELEGRAM_CHAT_IDS INSTAGRAM_COOKIES_FILE_PATH
 
-.PHONY: run build-linux-amd64 test tidy lint check-env
+.PHONY: run build-linux-amd64 test tidy lint check-env reload-instagram-cookies
 
 define LOAD_ENV
 if [[ -f "$(ENV_FILE)" ]]; then \
@@ -53,3 +53,11 @@ lint:
 
 tidy:
 	go mod tidy
+
+reload-instagram-cookies:
+	rm instagram.cookies
+	yt-dlp \
+		--skip-download \
+		--cookies-from-browser chromium+gnomekeyring \
+		--cookies instagram.cookies \
+		https://www.instagram.com/
