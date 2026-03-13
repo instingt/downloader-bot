@@ -107,8 +107,12 @@ func (h *InstagramHandler) downloadVideo(u *url.URL, tmpDir string) (string, err
 		h.ytDlpBinary,
 		"--no-playlist",
 		"--restrict-filenames",
-		"--merge-output-format", "mp4",
 		"--cookies", h.cookiesFilePath,
+
+		"-f", "bv*[vcodec~='^h264']+ba/b",
+
+		"--merge-output-format", "mp4",
+
 		"--print", "after_move:filepath",
 		"--paths", tmpDir,
 		u.String(),
