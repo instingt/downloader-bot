@@ -2,16 +2,17 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/url"
 	"os"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-
 	"bot-downloader/internal/config"
 	"bot-downloader/internal/handlers"
 	"bot-downloader/internal/logging"
+	"bot-downloader/internal/telegram"
+	"bot-downloader/internal/telegram/gotelegrambot"
 )
 
 func main() {
@@ -27,54 +28,50 @@ func main() {
 		os.Exit(1)
 	}
 
-	bot, err := tgbotapi.NewBotAPI(cfg.Token)
+	tgClient, err := gotelegrambot.New(cfg.Token, logger)
 	if err != nil {
 		logger.Error("failed to initialize telegram bot", "error", err)
 		os.Exit(1)
 	}
 
-	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 30
-
-	updates := bot.GetUpdatesChan(u)
-	logger.Info("bot authorized", "username", bot.Self.UserName)
+	username, err := tgClient.Username(context.Background())
+	if err != nil {
+		logger.Error("failed to fetch telegram bot profile", "error", err)
+		os.Exit(1)
+	}
+	logger.Info("bot authorized", "username", username)
 
 	var urlHandlers []handlers.Handler
 
 	urlHandlers = append(urlHandlers, handlers.NewTiktokHandler(cfg.YtDlpBinaryPath, logger))
 
-	for update := range updates {
-		if err := routeUpdate(bot, update, cfg, urlHandlers, logger); err != nil {
-			logger.Error("failed to handle update", "error", err)
-		}
+	if err := tgClient.Start(context.Background(), func(ctx context.Context, msg telegram.IncomingMessage) error {
+		return routeMessage(ctx, tgClient, msg, cfg, urlHandlers, logger)
+	}); err != nil {
+		logger.Error("telegram client stopped with error", "error", err)
+		os.Exit(1)
 	}
 }
 
-func routeUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update, cfg config.Config, handlers []handlers.Handler, logger *slog.Logger) error {
-	if update.Message == nil || update.Message.From == nil || update.Message.Chat == nil {
-		return nil
-	}
-
-	msg := update.Message
-
-	if msg.Chat.IsPrivate() {
-		if _, ok := cfg.AllowedUserIDs[msg.From.ID]; !ok {
+func routeMessage(ctx context.Context, tg telegram.Client, msg telegram.IncomingMessage, cfg config.Config, handlers []handlers.Handler, logger *slog.Logger) error {
+	if msg.ChatType == telegram.ChatTypePrivate {
+		if _, ok := cfg.AllowedUserIDs[msg.UserID]; !ok {
 			return nil
 		}
-		return handleMessage(bot, msg, handlers, logger)
+		return handleMessage(ctx, tg, msg, handlers, logger)
 	}
 
-	if msg.Chat.IsGroup() || msg.Chat.IsSuperGroup() {
-		if _, ok := cfg.AllowedChatIDs[msg.Chat.ID]; !ok {
+	if msg.ChatType == telegram.ChatTypeGroup || msg.ChatType == telegram.ChatTypeSupergroup {
+		if _, ok := cfg.AllowedChatIDs[msg.ChatID]; !ok {
 			return nil
 		}
-		return handleMessage(bot, msg, handlers, logger)
+		return handleMessage(ctx, tg, msg, handlers, logger)
 	}
 
 	return nil
 }
 
-func handleMessage(bot *tgbotapi.BotAPI, msg *tgbotapi.Message, handlers []handlers.Handler, logger *slog.Logger) error {
+func handleMessage(ctx context.Context, tg telegram.Client, msg telegram.IncomingMessage, handlers []handlers.Handler, logger *slog.Logger) error {
 	u, err := url.Parse(msg.Text)
 	if err != nil {
 		// this is not URL message, ignore it
@@ -83,14 +80,13 @@ func handleMessage(bot *tgbotapi.BotAPI, msg *tgbotapi.Message, handlers []handl
 
 	for _, h := range handlers {
 		if h.Matcher(u) {
-			logger.Info("matched message", "chat_id", msg.Chat.ID, "message_id", msg.MessageID, "url", u.String())
+			logger.Info("matched message", "chat_id", msg.ChatID, "message_id", msg.MessageID, "url", u.String())
 
-			deleteCfg := tgbotapi.NewDeleteMessage(msg.Chat.ID, msg.MessageID)
-			if _, err := bot.Request(deleteCfg); err != nil {
+			if err := tg.DeleteMessage(ctx, msg.ChatID, msg.MessageID); err != nil {
 				logger.Error(
 					"failed to delete matched message",
 					"chat_id",
-					msg.Chat.ID,
+					msg.ChatID,
 					"message_id",
 					msg.MessageID,
 					"error",
@@ -98,7 +94,7 @@ func handleMessage(bot *tgbotapi.BotAPI, msg *tgbotapi.Message, handlers []handl
 				)
 			}
 
-			if err := h.Handle(bot, u, msg.Chat.ID); err != nil {
+			if err := h.Handle(ctx, tg, u, msg.ChatID); err != nil {
 				return fmt.Errorf("handle matched url: %w", err)
 			}
 

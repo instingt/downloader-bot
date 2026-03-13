@@ -2,5 +2,7 @@ module bot-downloader
 
 go 1.25.0
 
-require github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
-require github.com/lmittmann/tint v1.0.7
+require (
+	github.com/go-telegram/bot v1.19.0
+	github.com/lmittmann/tint v1.0.7
+)

@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"bot-downloader/internal/telegram"
 )
 
 type TikTokHandler struct {
@@ -46,9 +46,9 @@ func (h *TikTokHandler) Matcher(u *url.URL) bool {
 	return host == "tiktok.com" || strings.HasSuffix(host, ".tiktok.com")
 }
 
-func (h *TikTokHandler) Handle(bot *tgbotapi.BotAPI, u *url.URL, replyChatID int64) error {
-	if bot == nil {
-		return errors.New("bot is nil")
+func (h *TikTokHandler) Handle(ctx context.Context, tg telegram.Client, u *url.URL, replyChatID int64) error {
+	if tg == nil {
+		return errors.New("telegram client is nil")
 	}
 	if u == nil {
 		return errors.New("url is nil")
@@ -77,10 +77,8 @@ func (h *TikTokHandler) Handle(bot *tgbotapi.BotAPI, u *url.URL, replyChatID int
 	}
 	h.logger.Info("tiktok download finished", "chat_id", replyChatID, "file", filePath)
 
-	videoMsg := tgbotapi.NewVideo(replyChatID, tgbotapi.FilePath(filePath))
-	if _, err := bot.Send(videoMsg); err != nil {
-		docMsg := tgbotapi.NewDocument(replyChatID, tgbotapi.FilePath(filePath))
-		if _, docErr := bot.Send(docMsg); docErr != nil {
+	if err := tg.SendVideoFile(ctx, replyChatID, filePath); err != nil {
+		if docErr := tg.SendDocumentFile(ctx, replyChatID, filePath); docErr != nil {
 			return fmt.Errorf("send video failed: %v; send document fallback failed: %w", err, docErr)
 		}
 		h.logger.Info("tiktok video sent as document", "chat_id", replyChatID, "file", filePath)

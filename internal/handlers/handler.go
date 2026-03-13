@@ -2,12 +2,13 @@
 package handlers
 
 import (
+	"context"
 	"net/url"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"bot-downloader/internal/telegram"
 )
 
 type Handler interface {
 	Matcher(*url.URL) bool
-	Handle(*tgbotapi.BotAPI, *url.URL, int64) error
+	Handle(context.Context, telegram.Client, *url.URL, int64) error
 }
