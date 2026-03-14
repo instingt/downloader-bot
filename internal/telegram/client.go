@@ -25,4 +25,5 @@ type Client interface {
 	DeleteMessage(context.Context, int64, int) error
 	SendVideoFile(context.Context, int64, string) error
 	SendDocumentFile(context.Context, int64, string) error
+	SendVideoWithDocumentFallback(context.Context, int64, string) error
 }

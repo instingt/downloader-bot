@@ -16,21 +16,26 @@ import (
 	"github.com/go-telegram/bot/models"
 
 	"bot-downloader/internal/telegram"
+	"bot-downloader/internal/video"
 )
 
 const pollTimeout = 31 * time.Second
 
 type Client struct {
-	bot    *telegrambot.Bot
-	logger *slog.Logger
+	bot              *telegrambot.Bot
+	logger           *slog.Logger
+	thumbnailService video.Thumbnailer
+	metadataService  video.MetadataReader
 
 	mu             sync.RWMutex
 	messageHandler telegram.MessageHandler
 }
 
-func New(token string, logger *slog.Logger) (*Client, error) {
+func New(token string, logger *slog.Logger, thumbnailService video.Thumbnailer, metadataService video.MetadataReader) (*Client, error) {
 	client := &Client{
-		logger: logger,
+		logger:           logger,
+		thumbnailService: thumbnailService,
+		metadataService:  metadataService,
 	}
 
 	b, err := telegrambot.New(
@@ -94,11 +99,34 @@ func (c *Client) SendVideoFile(ctx context.Context, chatID int64, path string) e
 		return fmt.Errorf("open video file: %w", err)
 	}
 
+	thumbPath, err := c.thumbnailService.CreateThumnail(ctx, path)
+	if err != nil {
+		return fmt.Errorf("generate thumbnail: %w", err)
+	}
+
+	thumb, err := os.Open(thumbPath)
+	if err != nil {
+		return fmt.Errorf("open thumb: %w", err)
+	}
+
+	probe, err := c.metadataService.ReadMetadata(ctx, path)
+	if err != nil {
+		return fmt.Errorf("probe video: %w", err)
+	}
+
 	_, err = c.bot.SendVideo(ctx, &telegrambot.SendVideoParams{
 		ChatID: chatID,
 		Video: &models.InputFileUpload{
 			Filename: filepath.Base(path),
 			Data:     file,
+		},
+		SupportsStreaming: true,
+		Width:             probe.Width,
+		Height:            probe.Height,
+		Duration:          probe.Duration,
+		Thumbnail: &models.InputFileUpload{
+			Filename: "thumb.jpg",
+			Data:     thumb,
 		},
 	})
 	closeErr := file.Close()
@@ -132,6 +160,19 @@ func (c *Client) SendDocumentFile(ctx context.Context, chatID int64, path string
 	if closeErr != nil {
 		return fmt.Errorf("close document file: %w", closeErr)
 	}
+
+	return nil
+}
+
+func (c *Client) SendVideoWithDocumentFallback(ctx context.Context, chatID int64, path string) error {
+	if err := c.SendVideoFile(ctx, chatID, path); err != nil {
+		if docErr := c.SendDocumentFile(ctx, chatID, path); docErr != nil {
+			return fmt.Errorf("send video failed: %v; send document fallback failed: %w", err, docErr)
+		}
+		c.logger.Info("video sent as document", "chat_id", chatID, "file", path)
+		return nil
+	}
+	c.logger.Info("video sent successfully", "chat_id", chatID, "file", path)
 
 	return nil
 }

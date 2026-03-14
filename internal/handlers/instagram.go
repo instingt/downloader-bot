@@ -13,18 +13,21 @@ import (
 	"time"
 
 	"bot-downloader/internal/telegram"
+	"bot-downloader/internal/video"
 )
 
 type InstagramHandler struct {
 	ytDlpBinary     string
 	cookiesFilePath string
+	encoder         video.Transcoder
 	logger          *slog.Logger
 }
 
-func NewInstagramHandler(ytDlpBinary string, cookiesFilePath string, logger *slog.Logger) *InstagramHandler {
+func NewInstagramHandler(ytDlpBinary string, cookiesFilePath string, encoder video.Transcoder, logger *slog.Logger) *InstagramHandler {
 	return &InstagramHandler{
 		ytDlpBinary:     ytDlpBinary,
 		cookiesFilePath: cookiesFilePath,
+		encoder:         encoder,
 		logger:          logger,
 	}
 }
@@ -65,6 +68,9 @@ func (h *InstagramHandler) Handle(ctx context.Context, tg telegram.Client, u *ur
 	if h.cookiesFilePath == "" {
 		return errors.New("instagram cookies file path is empty")
 	}
+	if h.encoder == nil {
+		return errors.New("video encoder is nil")
+	}
 	if h.logger == nil {
 		return errors.New("logger is nil")
 	}
@@ -82,18 +88,20 @@ func (h *InstagramHandler) Handle(ctx context.Context, tg telegram.Client, u *ur
 	h.logger.Info("instagram reel download started", "chat_id", replyChatID, "url", u.String())
 	filePath, err := h.downloadVideo(u, tmpDir)
 	if err != nil {
-		return err
+		return fmt.Errorf("download reel: %w", err)
 	}
 	h.logger.Info("instagram reel download finished", "chat_id", replyChatID, "file", filePath)
 
-	if err := tg.SendVideoFile(ctx, replyChatID, filePath); err != nil {
-		if docErr := tg.SendDocumentFile(ctx, replyChatID, filePath); docErr != nil {
-			return fmt.Errorf("send video failed: %v; send document fallback failed: %w", err, docErr)
-		}
-		h.logger.Info("instagram reel sent as document", "chat_id", replyChatID, "file", filePath)
-		return nil
+	encodedPath, err := h.encoder.Transcode(ctx, filePath)
+	if err != nil {
+		return fmt.Errorf("encode downloaded video: %w", err)
 	}
-	h.logger.Info("instagram reel sent successfully", "chat_id", replyChatID, "file", filePath)
+	h.logger.Info("instagram reel encoded", "chat_id", replyChatID, "input_file", filePath, "output_file", encodedPath)
+
+	err = tg.SendVideoWithDocumentFallback(ctx, replyChatID, filePath)
+	if err != nil {
+		return fmt.Errorf("sent instagram reel video: %w", err)
+	}
 
 	return nil
 }
@@ -108,11 +116,9 @@ func (h *InstagramHandler) downloadVideo(u *url.URL, tmpDir string) (string, err
 		"--no-playlist",
 		"--restrict-filenames",
 		"--cookies", h.cookiesFilePath,
-
-		"-f", "bv*[vcodec~='^h264']+ba/b",
-
+		"-S", "vcodec:h264,acodec:aac,res,fps",
+		"-f", "bv*+ba/b",
 		"--merge-output-format", "mp4",
-
 		"--print", "after_move:filepath",
 		"--paths", tmpDir,
 		u.String(),

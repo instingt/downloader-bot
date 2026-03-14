@@ -13,16 +13,19 @@ import (
 	"time"
 
 	"bot-downloader/internal/telegram"
+	"bot-downloader/internal/video"
 )
 
 type TikTokHandler struct {
 	ytDlpBinary string
+	encoder     video.Transcoder
 	logger      *slog.Logger
 }
 
-func NewTiktokHandler(ytDlpBinary string, logger *slog.Logger) *TikTokHandler {
+func NewTiktokHandler(ytDlpBinary string, encoder video.Transcoder, logger *slog.Logger) *TikTokHandler {
 	return &TikTokHandler{
 		ytDlpBinary: ytDlpBinary,
+		encoder:     encoder,
 		logger:      logger,
 	}
 }
@@ -55,6 +58,9 @@ func (h *TikTokHandler) Handle(ctx context.Context, tg telegram.Client, u *url.U
 	if h.ytDlpBinary == "" {
 		return errors.New("yt-dlp binary path is empty")
 	}
+	if h.encoder == nil {
+		return errors.New("video encoder is nil")
+	}
 	if h.logger == nil {
 		return errors.New("logger is nil")
 	}
@@ -76,14 +82,16 @@ func (h *TikTokHandler) Handle(ctx context.Context, tg telegram.Client, u *url.U
 	}
 	h.logger.Info("tiktok download finished", "chat_id", replyChatID, "file", filePath)
 
-	if err := tg.SendVideoFile(ctx, replyChatID, filePath); err != nil {
-		if docErr := tg.SendDocumentFile(ctx, replyChatID, filePath); docErr != nil {
-			return fmt.Errorf("send video failed: %v; send document fallback failed: %w", err, docErr)
-		}
-		h.logger.Info("tiktok video sent as document", "chat_id", replyChatID, "file", filePath)
-		return nil
+	encodedPath, err := h.encoder.Transcode(ctx, filePath)
+	if err != nil {
+		return fmt.Errorf("encode downloaded video: %w", err)
 	}
-	h.logger.Info("tiktok video sent successfully", "chat_id", replyChatID, "file", filePath)
+	h.logger.Info("tiktok video encoded", "chat_id", replyChatID, "input_file", filePath, "output_file", encodedPath)
+
+	err = tg.SendVideoWithDocumentFallback(ctx, replyChatID, filePath)
+	if err != nil {
+		return fmt.Errorf("send tiktok video: %w", err)
+	}
 
 	return nil
 }

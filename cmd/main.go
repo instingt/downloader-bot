@@ -11,6 +11,8 @@ import (
 	"bot-downloader/internal/config"
 	"bot-downloader/internal/handlers"
 	"bot-downloader/internal/logging"
+	"bot-downloader/internal/services/ffmpeg"
+	"bot-downloader/internal/services/ffprobe"
 	"bot-downloader/internal/telegram"
 	"bot-downloader/internal/telegram/gotelegrambot"
 )
@@ -28,7 +30,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	tgClient, err := gotelegrambot.New(cfg.Token, logger)
+	ffmpegService, err := ffmpeg.New(cfg.FFmpegBinaryPath)
+	if err != nil {
+		logger.Error("failed to initialize ffmpeg service", "error", err)
+		os.Exit(1)
+	}
+	metadataService, err := ffprobe.New(cfg.FFprobeBinaryPath)
+	if err != nil {
+		logger.Error("failed to initialize ffprobe service", "error", err)
+		os.Exit(1)
+	}
+
+	tgClient, err := gotelegrambot.New(cfg.Token, logger, ffmpegService, metadataService)
 	if err != nil {
 		logger.Error("failed to initialize telegram bot", "error", err)
 		os.Exit(1)
@@ -43,8 +56,8 @@ func main() {
 
 	var urlHandlers []handlers.Handler
 
-	urlHandlers = append(urlHandlers, handlers.NewTiktokHandler(cfg.YtDlpBinaryPath, logger))
-	urlHandlers = append(urlHandlers, handlers.NewInstagramHandler(cfg.YtDlpBinaryPath, cfg.InstagramCookiesFilePath, logger))
+	urlHandlers = append(urlHandlers, handlers.NewTiktokHandler(cfg.YtDlpBinaryPath, ffmpegService, logger))
+	urlHandlers = append(urlHandlers, handlers.NewInstagramHandler(cfg.YtDlpBinaryPath, cfg.InstagramCookiesFilePath, ffmpegService, logger))
 
 	if err := tgClient.Start(context.Background(), func(ctx context.Context, msg telegram.IncomingMessage) error {
 		return routeMessage(ctx, tgClient, msg, cfg, urlHandlers, logger)

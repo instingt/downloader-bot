@@ -16,6 +16,8 @@ type Config struct {
 	AllowedUserIDs           map[int64]struct{}
 	AllowedChatIDs           map[int64]struct{}
 	YtDlpBinaryPath          string
+	FFmpegBinaryPath         string
+	FFprobeBinaryPath        string
 	InstagramCookiesFilePath string
 }
 
@@ -48,6 +50,16 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("yt-dlp binary not found in PATH: %w", err)
 	}
 
+	ffmpegBinaryPath, err := exec.LookPath("ffmpeg")
+	if err != nil {
+		return Config{}, fmt.Errorf("ffmpeg binary not found in PATH: %w", err)
+	}
+
+	ffprobeBinaryPath, err := exec.LookPath("ffprobe")
+	if err != nil {
+		return Config{}, fmt.Errorf("ffprobe binary not found in PATH: %w", err)
+	}
+
 	instagramCookiesFilePath := strings.TrimSpace(os.Getenv("INSTAGRAM_COOKIES_FILE_PATH"))
 	if instagramCookiesFilePath == "" {
 		return Config{}, errors.New("INSTAGRAM_COOKIES_FILE_PATH is required")
@@ -67,6 +79,8 @@ func Load() (Config, error) {
 		AllowedUserIDs:           userIDs,
 		AllowedChatIDs:           chatIDs,
 		YtDlpBinaryPath:          ytDlpBinaryPath,
+		FFmpegBinaryPath:         ffmpegBinaryPath,
+		FFprobeBinaryPath:        ffprobeBinaryPath,
 		InstagramCookiesFilePath: instagramCookiesFilePath,
 	}, nil
 }
