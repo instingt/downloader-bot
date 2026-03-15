@@ -70,14 +70,16 @@ func main() {
 func routeMessage(ctx context.Context, tg telegram.Client, msg telegram.IncomingMessage, cfg config.Config, handlers []handlers.Handler, logger *slog.Logger) error {
 	if msg.ChatType == telegram.ChatTypePrivate {
 		if _, ok := cfg.AllowedUserIDs[msg.UserID]; !ok {
-			return nil
+			logger.Warn("unauthorized user tried to interact with the bot", "user_id", msg.UserID, "chat_id", msg.ChatID)
+			return tg.SendAuthErrorMessage(ctx, msg.ChatID)
 		}
 		return handleMessage(ctx, tg, msg, handlers, logger)
 	}
 
 	if msg.ChatType == telegram.ChatTypeGroup || msg.ChatType == telegram.ChatTypeSupergroup {
 		if _, ok := cfg.AllowedChatIDs[msg.ChatID]; !ok {
-			return nil
+			logger.Warn("unauthorized chat tried to interact with the bot", "chat_id", msg.ChatID)
+			return tg.SendAuthErrorMessage(ctx, msg.ChatID)
 		}
 		return handleMessage(ctx, tg, msg, handlers, logger)
 	}
@@ -109,7 +111,9 @@ func handleMessage(ctx context.Context, tg telegram.Client, msg telegram.Incomin
 			}
 
 			if err := h.Handle(ctx, tg, u, msg.ChatID); err != nil {
-				return fmt.Errorf("handle matched url: %w", err)
+				logger.Error("failed to handle message with handler", "error", err, "chat_id", msg.ChatID, "message_id", msg.MessageID, "url", u.String())
+
+				return tg.SendHandledErrorMessage(ctx, msg.ChatID)
 			}
 
 			return nil

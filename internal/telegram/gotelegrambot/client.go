@@ -177,6 +177,38 @@ func (c *Client) SendVideoWithDocumentFallback(ctx context.Context, chatID int64
 	return nil
 }
 
+func (c *Client) SendHandledErrorMessage(ctx context.Context, chatID int64) error {
+	_, err := c.bot.SendMessage(ctx, &telegrambot.SendMessageParams{
+		ChatID: chatID,
+		Text:   "Простите, я не справился :(",
+	})
+	if err != nil {
+		return fmt.Errorf("send handled error message: %w", err)
+	}
+
+	return nil
+}
+
+func (c *Client) SendAuthErrorMessage(ctx context.Context, chatID int64) error {
+	var errorText string
+	// if now is New Year, send special message
+	now := time.Now()
+	if now.Month() == time.January && now.Day() == 1 {
+		errorText = "С Новым Годом! 🎉"
+	} else {
+		errorText = "Не трогай, это на новый год!"
+	}
+	_, err := c.bot.SendMessage(ctx, &telegrambot.SendMessageParams{
+		ChatID: chatID,
+		Text:   errorText,
+	})
+	if err != nil {
+		return fmt.Errorf("send auth error message: %w", err)
+	}
+
+	return nil
+}
+
 func (c *Client) handleBotError(err error) {
 	if c.logger == nil {
 		return
