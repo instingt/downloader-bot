@@ -79,7 +79,9 @@ func routeMessage(ctx context.Context, tg telegram.Client, msg telegram.Incoming
 	if msg.ChatType == telegram.ChatTypeGroup || msg.ChatType == telegram.ChatTypeSupergroup {
 		if _, ok := cfg.AllowedChatIDs[msg.ChatID]; !ok {
 			logger.Warn("unauthorized chat tried to interact with the bot", "chat_id", msg.ChatID)
-			return tg.SendAuthErrorMessage(ctx, msg.ChatID)
+			logger.Warn(fmt.Sprintf("message text: %s", msg.Text))
+			// do nothering
+			return nil
 		}
 		return handleMessage(ctx, tg, msg, handlers, logger)
 	}
