@@ -5,7 +5,7 @@ SHELL := bash
 ENV_FILE ?= .env
 REQUIRED_ENV_VARS := TELEGRAM_BOT_TOKEN ALLOWED_TELEGRAM_USER_IDS ALLOWED_TELEGRAM_CHAT_IDS INSTAGRAM_COOKIES_FILE_PATH
 
-.PHONY: run build-linux-amd64 test tidy lint check-env reload-instagram-cookies
+.PHONY: run build-linux-amd64 deploy test tidy lint check-env reload-instagram-cookies
 
 define LOAD_ENV
 if [[ -f "$(ENV_FILE)" ]]; then \
@@ -43,7 +43,12 @@ run: check-env
 
 build-linux-amd64:
 	@mkdir -p bin
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o bin/bot-linux-amd64 ./cmd/main.go
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o bin/bot ./cmd/main.go
+
+deploy: build-linux-amd64
+	ssh bot 'mkdir -p ~/bot'
+	scp bin/bot bot:bot/bot.tmp
+	ssh bot 'mv ~/bot/bot.tmp ~/bot/bot && chmod u+x ~/bot/bot && systemctl restart bot'
 
 test:
 	go test ./...
