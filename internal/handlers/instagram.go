@@ -86,6 +86,7 @@ func (h *InstagramHandler) Handle(ctx context.Context, tg telegram.Client, u *ur
 	}()
 
 	h.logger.Info("instagram reel download started", "chat_id", replyChatID, "url", u.String())
+	downloadedCounter.WithLabelValues("instagram").Inc()
 	filePath, err := h.downloadVideo(u, tmpDir)
 	if err != nil {
 		return fmt.Errorf("download reel: %w", err)

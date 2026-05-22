@@ -76,6 +76,7 @@ func (h *TikTokHandler) Handle(ctx context.Context, tg telegram.Client, u *url.U
 	}()
 
 	h.logger.Info("tiktok download started", "chat_id", replyChatID, "url", u.String())
+	downloadedCounter.WithLabelValues("tiktok").Inc()
 	filePath, err := h.downloadVideo(u, tmpDir)
 	if err != nil {
 		return err

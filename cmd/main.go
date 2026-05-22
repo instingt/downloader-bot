@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"net/url"
 	"os"
 
@@ -15,6 +16,8 @@ import (
 	"bot-downloader/internal/services/ffprobe"
 	"bot-downloader/internal/telegram"
 	"bot-downloader/internal/telegram/gotelegrambot"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -55,6 +58,19 @@ func main() {
 	logger.Info("bot authorized", "username", username)
 
 	var urlHandlers []handlers.Handler
+
+	promMux := http.NewServeMux()
+	promMux.Handle("/metrics", promhttp.Handler())
+	promServer := &http.Server{
+		Addr:    ":2112",
+		Handler: promMux,
+	}
+	go func() {
+		logger.Info("starting prometheus metrics server", "addr", promServer.Addr)
+		if err := promServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Error("prometheus metrics server stopped with error", "error", err)
+		}
+	}()
 
 	urlHandlers = append(urlHandlers, handlers.NewTiktokHandler(cfg.YtDlpBinaryPath, ffmpegService, logger))
 	urlHandlers = append(urlHandlers, handlers.NewInstagramHandler(cfg.YtDlpBinaryPath, cfg.InstagramCookiesFilePath, ffmpegService, logger))
