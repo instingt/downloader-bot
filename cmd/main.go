@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
+	"strings"
 
 	"bot-downloader/internal/config"
 	"bot-downloader/internal/handlers"
@@ -19,6 +21,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
+
+var urlPattern = regexp.MustCompile(`https?://\S+`)
 
 func main() {
 	cfg, err := config.Load()
@@ -106,9 +110,9 @@ func routeMessage(ctx context.Context, tg telegram.Client, msg telegram.Incoming
 }
 
 func handleMessage(ctx context.Context, tg telegram.Client, msg telegram.IncomingMessage, handlers []handlers.Handler, logger *slog.Logger) error {
-	u, err := url.Parse(msg.Text)
-	if err != nil {
-		// this is not URL message, ignore it
+	u, ok := extractSingleURL(msg.Text)
+	if !ok {
+		// this is not a message with exactly one URL, ignore it
 		return nil
 	}
 
@@ -140,4 +144,22 @@ func handleMessage(ctx context.Context, tg telegram.Client, msg telegram.Incomin
 
 	// don't found any handlers for given URL
 	return nil
+}
+
+func extractSingleURL(text string) (*url.URL, bool) {
+	matches := urlPattern.FindAllString(text, -1)
+	if len(matches) != 1 {
+		return nil, false
+	}
+
+	rawURL := strings.Trim(matches[0], `"'.,!?;:()[]{}<>`)
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, false
+	}
+	if u.Scheme == "" || u.Host == "" {
+		return nil, false
+	}
+
+	return u, true
 }
