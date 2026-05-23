@@ -46,9 +46,8 @@ build-linux-amd64:
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o bin/bot ./cmd/main.go
 
 deploy: build-linux-amd64
-	ssh bot 'mkdir -p ~/bot'
 	scp bin/bot bot:bot/bot.tmp
-	ssh bot 'mv ~/bot/bot.tmp ~/bot/bot && chmod u+x ~/bot/bot && systemctl restart bot'
+	ssh bot 'mv ~/bot/bot.tmp ~/bot/bot && chmod u+x ~/bot/bot && systemctl --user restart bot'
 
 test:
 	go test ./...
