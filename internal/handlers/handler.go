@@ -10,5 +10,5 @@ import (
 
 type Handler interface {
 	Matcher(*url.URL) bool
-	Handle(context.Context, telegram.Client, *url.URL, int64) error
+	Handle(context.Context, telegram.Client, *url.URL, int64, int64) error
 }

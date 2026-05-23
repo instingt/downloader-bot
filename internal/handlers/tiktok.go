@@ -48,7 +48,7 @@ func (h *TikTokHandler) Matcher(u *url.URL) bool {
 	return host == "tiktok.com" || strings.HasSuffix(host, ".tiktok.com")
 }
 
-func (h *TikTokHandler) Handle(ctx context.Context, tg telegram.Client, u *url.URL, replyChatID int64) error {
+func (h *TikTokHandler) Handle(ctx context.Context, tg telegram.Client, u *url.URL, replyChatID int64, userID int64) error {
 	if tg == nil {
 		return errors.New("telegram client is nil")
 	}
@@ -76,7 +76,7 @@ func (h *TikTokHandler) Handle(ctx context.Context, tg telegram.Client, u *url.U
 	}()
 
 	h.logger.Info("tiktok download started", "chat_id", replyChatID, "url", u.String())
-	downloadedCounter.WithLabelValues("tiktok").Inc()
+	downloadedCounter.WithLabelValues("tiktok", fmt.Sprintf("%d", userID)).Inc()
 	filePath, err := h.downloadVideo(u, tmpDir)
 	if err != nil {
 		return err

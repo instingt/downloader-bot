@@ -132,7 +132,7 @@ func handleMessage(ctx context.Context, tg telegram.Client, msg telegram.Incomin
 				)
 			}
 
-			if err := h.Handle(ctx, tg, u, msg.ChatID); err != nil {
+			if err := h.Handle(ctx, tg, u, msg.ChatID, msg.UserID); err != nil {
 				logger.Error("failed to handle message with handler", "error", err, "chat_id", msg.ChatID, "message_id", msg.MessageID, "url", u.String())
 
 				return tg.SendHandledErrorMessage(ctx, msg.ChatID)

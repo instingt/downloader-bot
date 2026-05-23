@@ -55,7 +55,7 @@ func (h *InstagramHandler) Matcher(u *url.URL) bool {
 	return strings.HasPrefix(path, "/reel/")
 }
 
-func (h *InstagramHandler) Handle(ctx context.Context, tg telegram.Client, u *url.URL, replyChatID int64) error {
+func (h *InstagramHandler) Handle(ctx context.Context, tg telegram.Client, u *url.URL, replyChatID int64, userID int64) error {
 	if tg == nil {
 		return errors.New("telegram client is nil")
 	}
@@ -86,7 +86,7 @@ func (h *InstagramHandler) Handle(ctx context.Context, tg telegram.Client, u *ur
 	}()
 
 	h.logger.Info("instagram reel download started", "chat_id", replyChatID, "url", u.String())
-	downloadedCounter.WithLabelValues("instagram").Inc()
+	downloadedCounter.WithLabelValues("instagram", fmt.Sprintf("%d", userID)).Inc()
 	filePath, err := h.downloadVideo(u, tmpDir)
 	if err != nil {
 		return fmt.Errorf("download reel: %w", err)

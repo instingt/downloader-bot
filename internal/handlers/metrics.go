@@ -10,4 +10,4 @@ var downloadedCounter = promauto.NewCounterVec(prometheus.CounterOpts{
 	Subsystem: "downloader",
 	Name:      "downloaded_total",
 	Help:      "Total number of downloaded videos",
-}, []string{"service"})
+}, []string{"service", "user_Id"})
