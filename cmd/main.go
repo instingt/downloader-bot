@@ -77,6 +77,7 @@ func main() {
 	}()
 
 	urlHandlers = append(urlHandlers, handlers.NewTiktokHandler(cfg.YtDlpBinaryPath, ffmpegService, logger))
+	urlHandlers = append(urlHandlers, handlers.NewYouTubeShortsHandler(cfg.YtDlpBinaryPath, ffmpegService, logger))
 	urlHandlers = append(urlHandlers, handlers.NewInstagramHandler(cfg.YtDlpBinaryPath, cfg.InstagramCookiesFilePath, ffmpegService, logger))
 
 	if err := tgClient.Start(context.Background(), func(ctx context.Context, msg telegram.IncomingMessage) error {
